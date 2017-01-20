@@ -4,6 +4,7 @@ import "net/http"
 
 //Session ...
 type Session struct {
+	SID    string
 	Values map[interface{}]interface{}
 	store  Store
 	name   string

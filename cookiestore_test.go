@@ -8,19 +8,24 @@ import (
 
 func TestCookieStore(t *testing.T) {
 
-	t.Run("CookieStore use default options that should be", func(t *testing.T) {
+	t.Run("CookieStore use Encode options that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		defer func() {
 			err := recover()
 			assert.NotNil(err)
 		}()
 
-		cs := &CookieStore{
-			options: nil,
-		}
-		val, err := cs.Encode("x", nil)
-		assert.Equal("", val)
-		t.Log(err)
+		cs := &CookieStore{}
+		val, err := cs.Encode(nil)
+		assert.Empty(val)
+		assert.NotNil(err)
+	})
+
+	t.Run("CookieStore with Decode that should be", func(t *testing.T) {
+		assert := assert.New(t)
+		cs := &CookieStore{}
+		var i int
+		err := cs.Decode("", i)
 		assert.NotNil(err)
 	})
 

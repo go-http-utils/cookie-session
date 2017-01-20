@@ -13,10 +13,9 @@ func TestGearsession(t *testing.T) {
 	t.Run("gearsession use default options that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/health-check", nil)
-		store := NewCookieStore(nil)
+		store := New()
 
 		cookiekey := "teambition"
-
 		recorder := httptest.NewRecorder()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -34,7 +33,7 @@ func TestGearsession(t *testing.T) {
 		t.Log(cookies.Value)
 		//======reuse=====
 		req, err = http.NewRequest("GET", "/health-check", nil)
-		store = NewCookieStore(nil)
+		store = New(nil)
 		req.AddCookie(cookies)
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session, _ := store.Get(r, cookiekey)

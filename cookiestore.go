@@ -9,20 +9,24 @@ import (
 	"github.com/go-http-utils/cookie"
 )
 
-//NewCookieStore ...
-func NewCookieStore(opts *cookie.Options) Store {
+//New an CookieStore instance
+func New(opts ...*cookie.GlobalOptions) Store {
+	var opt *cookie.GlobalOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 	cs := &CookieStore{
-		options: opts,
+		options: opt,
 	}
 	return cs
 }
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	options *cookie.Options
+	options *cookie.GlobalOptions
 }
 
-//Get ...
+//Get existed session from Request's cookies
 func (c *CookieStore) Get(r *http.Request, name string) (session *Session, err error) {
 	session, err = c.New(r, name)
 	session.name = name
@@ -30,31 +34,31 @@ func (c *CookieStore) Get(r *http.Request, name string) (session *Session, err e
 	return
 }
 
-//New ...
+//New an session instance
 func (c *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(name, c)
 	var err error
 	cookies := cookie.New(nil, r, c.options)
-	val, err := cookies.Get(name, nil)
+	val, err := cookies.Get(name)
 	if val != "" {
-		c.Decode(name, val, &session.Values)
+		c.Decode(val, &session.Values)
 	}
 	return session, err
 }
 
-//Save ...
+//Save session to Response's cookie
 func (c *CookieStore) Save(r *http.Request, w http.ResponseWriter, s *Session) error {
-	encoded, err := c.Encode(s.name, s.Values)
+	encoded, err := c.Encode(s.Values)
 	if err != nil {
 		return err
 	}
 	cookies := cookie.New(w, r, c.options)
-	cookies.Set(s.name, encoded, nil)
+	cookies.Set(s.name, encoded)
 	return nil
 }
 
-//Encode ...
-func (c *CookieStore) Encode(name string, value interface{}) (string, error) {
+//Encode the value by Serializer and Base64
+func (c *CookieStore) Encode(value interface{}) (string, error) {
 
 	//Serializer
 	buf := new(bytes.Buffer)
@@ -64,36 +68,27 @@ func (c *CookieStore) Encode(name string, value interface{}) (string, error) {
 	}
 	b := buf.Bytes()
 
-	//base64
-	encoded := make([]byte, base64.URLEncoding.EncodedLen(len(b)))
-	base64.URLEncoding.Encode(encoded, b)
+	//Base64
+	encoded := make([]byte, base64.RawURLEncoding.EncodedLen(len(b)))
+	base64.RawURLEncoding.Encode(encoded, b)
 
 	return string(encoded), nil
 }
 
-//Decode decodes a cookie value.
-func (c *CookieStore) Decode(name, value string, dst interface{}) error {
+//Decode the value to dst .
+func (c *CookieStore) Decode(value string, dst interface{}) error {
 
 	//base64
-	b, err := decode([]byte(value))
+	val := []byte(value)
+	decoded := make([]byte, base64.RawURLEncoding.DecodedLen(len(val)))
+	b, err := base64.RawURLEncoding.Decode(decoded, val)
 	if err != nil {
 		return err
 	}
-
 	//Serializer
-	dec := gob.NewDecoder(bytes.NewBuffer(b))
+	dec := gob.NewDecoder(bytes.NewBuffer(decoded[:b]))
 	if err := dec.Decode(dst); err != nil {
 		return err
 	}
 	return nil
-}
-
-// decode decodes a cookie using base64.
-func decode(value []byte) ([]byte, error) {
-	decoded := make([]byte, base64.URLEncoding.DecodedLen(len(value)))
-	b, err := base64.URLEncoding.Decode(decoded, value)
-	if err != nil {
-		return nil, err
-	}
-	return decoded[:b], nil
 }

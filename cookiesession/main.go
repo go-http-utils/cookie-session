@@ -9,7 +9,7 @@ import (
 
 func main() {
 	req, _ := http.NewRequest("GET", "/health-check", nil)
-	store := cookiesession.NewCookieStore(nil)
+	store := cookiesession.New()
 
 	cookiekey := "teambition"
 
@@ -25,7 +25,7 @@ func main() {
 	cookies, _ := getCookie(cookiekey, recorder)
 
 	//======reuse=====
-	store = cookiesession.NewCookieStore(nil)
+	store = cookiesession.New()
 	req.AddCookie(cookies)
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		store.Get(r, cookiekey)
