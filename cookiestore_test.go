@@ -15,17 +15,15 @@ func TestCookieStore(t *testing.T) {
 			assert.NotNil(err)
 		}()
 
-		cs := &CookieStore{}
-		val, err := cs.Encode(nil)
+		val, err := Encode(nil)
 		assert.Empty(val)
 		assert.NotNil(err)
 	})
 
 	t.Run("CookieStore with Decode that should be", func(t *testing.T) {
 		assert := assert.New(t)
-		cs := &CookieStore{}
 		var i int
-		err := cs.Decode("", i)
+		err := Decode("", i)
 		assert.NotNil(err)
 	})
 
