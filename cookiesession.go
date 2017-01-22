@@ -22,7 +22,7 @@ type Options struct {
 	HTTPOnly bool
 }
 
-//Session ...
+// Session stores the values and optional configuration for a session.
 type Session struct {
 	SID     string
 	Values  map[interface{}]interface{}
@@ -31,17 +31,17 @@ type Session struct {
 	name    string
 }
 
-// Name returns the name used to register the session.
+// Name returns the name used to register the session
 func (s *Session) Name() string {
 	return s.name
 }
 
-// Store returns the session store used to register the session.
+// Store returns the session store used to register the session
 func (s *Session) Store() Store {
 	return s.store
 }
 
-//NewSession ...
+// NewSession is called by session stores to create a new session instance
 func NewSession(name string, store Store) *Session {
 	session := &Session{
 		Values: make(map[interface{}]interface{}),
@@ -51,12 +51,12 @@ func NewSession(name string, store Store) *Session {
 	return session
 }
 
-//Save ....
+// Save is a convenience method to save current session
 func (s *Session) Save(r *http.Request, w http.ResponseWriter) {
 	s.store.Save(r, w, s)
 }
 
-//Encode the value by Serializer and Base64
+// Encode the value by Serializer and Base64
 func Encode(value interface{}) (string, error) {
 
 	//Serializer
@@ -74,7 +74,7 @@ func Encode(value interface{}) (string, error) {
 	return string(encoded), nil
 }
 
-//Decode the value to dst .
+// Decode the value to dst .
 func Decode(value string, dst interface{}) error {
 
 	//base64

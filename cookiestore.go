@@ -6,7 +6,7 @@ import (
 	"github.com/go-http-utils/cookie"
 )
 
-//New an CookieStore instance
+// New an CookieStore instance
 func New(opts ...*cookie.GlobalOptions) Store {
 	var opt *cookie.GlobalOptions
 	if len(opts) > 0 {
@@ -30,7 +30,7 @@ type CookieStore struct {
 	options *cookie.GlobalOptions
 }
 
-//Get existed session from Request's cookies
+// Get existed session from Request's cookies
 func (c *CookieStore) Get(r *http.Request, name string) (session *Session, err error) {
 	session, err = c.New(r, name)
 	session.name = name
@@ -38,7 +38,7 @@ func (c *CookieStore) Get(r *http.Request, name string) (session *Session, err e
 	return
 }
 
-//New an session instance
+// New an session instance
 func (c *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	session := NewSession(name, c)
 	session.Options = &Options{
@@ -57,7 +57,7 @@ func (c *CookieStore) New(r *http.Request, name string) (*Session, error) {
 	return session, err
 }
 
-//Save session to Response's cookie
+// Save session to Response's cookie
 func (c *CookieStore) Save(r *http.Request, w http.ResponseWriter, s *Session) error {
 	encoded, err := Encode(s.Values)
 	if err != nil {
