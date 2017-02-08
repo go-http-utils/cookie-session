@@ -20,6 +20,7 @@ type Options struct {
 	MaxAge   int
 	Secure   bool
 	HTTPOnly bool
+	Signed   bool // optional
 }
 
 // Session stores the values and optional configuration for a session.
@@ -52,8 +53,8 @@ func NewSession(name string, store Store) *Session {
 }
 
 // Save is a convenience method to save current session
-func (s *Session) Save(r *http.Request, w http.ResponseWriter) {
-	s.store.Save(r, w, s)
+func (s *Session) Save(options ...*Options) {
+	s.store.Save(s, options...)
 }
 
 // Encode the value by Serializer and Base64
@@ -118,11 +119,11 @@ func NewCookie(name, value string, options *Options) *http.Cookie {
 // Store is an interface for custom session stores.
 type Store interface {
 	// Get should return a cached session.
-	Get(r *http.Request, name string) (*Session, error)
+	Get(name string, signed ...bool) (*Session, error)
 
 	// New should create and return a new session.
-	New(r *http.Request, name string) (*Session, error)
+	New(name string) (*Session, error)
 
 	// Save should persist session to the underlying store implementation.
-	Save(r *http.Request, w http.ResponseWriter, s *Session) error
+	Save(s *Session, options ...*Options) error
 }

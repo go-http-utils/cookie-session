@@ -16,16 +16,16 @@ Use cookie as session, base on [secure cookie](https://github.com/go-http-utils/
 
 ##Examples
 ```go
-    store := cookiesession.New(&cookie.GlobalOptions{
-			MaxAge:   86400 * 7,
-			Secure:   true,
-			HTTPOnly: true,
-			Path:     "/",
-		})
+go run cookiesession/main.go
+```
+##Usage
+```go
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, "login")
+		store := cookiesession.New(w, r)
+		session, _ := store.Get("login")
 		session.Values["name"] = "mushroom"
-		session.Values[66] = 99
-		session.Save(r, w)
+		session.Values[66] = 99  //set session
+		println(session.Values["name"].(string)) //get session
+		session.Save()
 	})
 ```

@@ -7,63 +7,56 @@ import (
 )
 
 // New an CookieStore instance
-func New(opts ...*cookie.GlobalOptions) Store {
-	var opt *cookie.GlobalOptions
-	if len(opts) > 0 {
-		opt = opts[0]
-	} else {
-		opt = &cookie.GlobalOptions{
-			MaxAge:   86400 * 7,
-			Secure:   true,
-			HTTPOnly: true,
-			Path:     "/",
-		}
-	}
-	cs := &CookieStore{
-		options: opt,
-	}
+func New(w http.ResponseWriter, r *http.Request, keys ...[]string) Store {
+	cs := &CookieStore{cookie: cookie.New(w, r, keys...)}
 	return cs
 }
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	options *cookie.GlobalOptions
+	cookie *cookie.Cookies
 }
 
 // Get existed session from Request's cookies
-func (c *CookieStore) Get(r *http.Request, name string) (session *Session, err error) {
-	session, err = c.New(r, name)
+func (c *CookieStore) Get(name string, signed ...bool) (session *Session, err error) {
+	session = NewSession(name, c)
+
+	val, err := c.cookie.Get(name, signed...)
+	if val != "" {
+		Decode(val, &session.Values)
+	}
 	session.name = name
 	session.store = c
 	return
 }
 
 // New an session instance
-func (c *CookieStore) New(r *http.Request, name string) (*Session, error) {
-	session := NewSession(name, c)
-	session.Options = &Options{
-		Path:     c.options.Path,
-		Domain:   c.options.Domain,
-		MaxAge:   c.options.MaxAge,
-		Secure:   c.options.Secure,
-		HTTPOnly: c.options.HTTPOnly,
-	}
-	var err error
-	cookies := cookie.New(nil, r, c.options)
-	val, err := cookies.Get(name)
-	if val != "" {
-		Decode(val, &session.Values)
-	}
-	return session, err
+func (c *CookieStore) New(name string) (session *Session, err error) {
+	session = NewSession(name, c)
+	session.name = name
+	session.store = c
+	return
 }
 
 // Save session to Response's cookie
-func (c *CookieStore) Save(r *http.Request, w http.ResponseWriter, s *Session) error {
+func (c *CookieStore) Save(s *Session, options ...*Options) error {
 	encoded, err := Encode(s.Values)
 	if err != nil {
 		return err
 	}
-	cookies := cookie.New(w, r, c.options)
-	cookies.Set(s.name, encoded)
+	if len(options) > 0 {
+		option := options[0]
+		opts := &cookie.Options{
+			Path:     option.Path,
+			Domain:   option.Domain,
+			MaxAge:   option.MaxAge,
+			Secure:   option.Secure,
+			HTTPOnly: option.HTTPOnly,
+			Signed:   option.Signed,
+		}
+		c.cookie.Set(s.name, encoded, opts)
+	} else {
+		c.cookie.Set(s.name, encoded)
+	}
 	return nil
 }

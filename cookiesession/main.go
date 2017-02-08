@@ -9,26 +9,29 @@ import (
 
 func main() {
 	req, _ := http.NewRequest("GET", "/health-check", nil)
-	store := cookiesession.New()
 
 	cookiekey := "teambition"
 
 	recorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, cookiekey)
+		store := cookiesession.New(w, r)
+		session, _ := store.Get(cookiekey)
 		session.Values["name"] = "mushroom"
 		session.Values[66] = 99
-		session.Save(r, w)
+		session.Save()
 	})
 	handler.ServeHTTP(recorder, req)
 
 	cookies, _ := getCookie(cookiekey, recorder)
 
 	//======reuse=====
-	store = cookiesession.New()
+
 	req.AddCookie(cookies)
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store.Get(r, cookiekey)
+		store := cookiesession.New(w, r)
+		session, _ := store.Get(cookiekey)
+		println(session.Values["name"].(string))
+		println(session.Values[66].(int))
 	})
 	handler.ServeHTTP(recorder, req)
 }
