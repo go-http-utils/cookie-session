@@ -20,11 +20,11 @@ go run cookiesession/main.go
 ```
 ##Usage
 ```go
+    store := sessions.New([]string{"key"})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store := cookiesession.New(w, r)
-		session, _ := store.Get("login")
+		store.Init(w, r, false)
+		session, _ := sessions.Get(sessionkey, store)
 		session.Values["name"] = "mushroom"
-		session.Values[66] = 99  //set session
 		println(session.Values["name"].(string)) //get session
 		session.Save()
 	})

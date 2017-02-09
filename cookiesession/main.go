@@ -4,34 +4,34 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	cookiesession "github.com/go-http-utils/cookie-session"
+	"github.com/go-http-utils/cookie-session"
 )
 
 func main() {
-	req, _ := http.NewRequest("GET", "/health-check", nil)
 
-	cookiekey := "teambition"
+	sessionkey := "sessionid"
+	store := sessions.New([]string{"key"})
+
+	req, _ := http.NewRequest("GET", "/", nil)
 
 	recorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store := cookiesession.New(w, r)
-		session, _ := store.Get(cookiekey)
+		store.Init(w, r, false)
+		session, _ := sessions.Get(sessionkey, store)
 		session.Values["name"] = "mushroom"
-		session.Values[66] = 99
+
 		session.Save()
 	})
 	handler.ServeHTTP(recorder, req)
 
-	cookies, _ := getCookie(cookiekey, recorder)
-
 	//======reuse=====
-
+	cookies, _ := getCookie(sessionkey, recorder)
 	req.AddCookie(cookies)
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store := cookiesession.New(w, r)
-		session, _ := store.Get(cookiekey)
+		store.Init(w, r, false)
+		session, _ := sessions.Get(sessionkey, store)
 		println(session.Values["name"].(string))
-		println(session.Values[66].(int))
+		println(session.Values["num"].(int))
 	})
 	handler.ServeHTTP(recorder, req)
 }
