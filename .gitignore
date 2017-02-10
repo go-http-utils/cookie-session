@@ -23,6 +23,7 @@ _testmain.go
 *.test
 *.prof
 debug
-make.bat
+make.ps1
 *.coverprofile
 debug.log
+.vscode

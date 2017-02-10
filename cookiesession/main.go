@@ -10,17 +10,20 @@ import (
 func main() {
 
 	sessionkey := "sessionid"
-	store := sessions.New([]string{"key"})
 
 	req, _ := http.NewRequest("GET", "/", nil)
 
 	recorder := httptest.NewRecorder()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store.Init(w, r, false)
-		session, _ := sessions.Get(sessionkey, store)
+
+		store := sessions.NewCookieStore([]string{"key"})
+
+		session, _ := sessions.New(sessionkey, store, w, r)
+
 		session.Values["name"] = "mushroom"
 
 		session.Save()
+
 	})
 	handler.ServeHTTP(recorder, req)
 
@@ -28,10 +31,11 @@ func main() {
 	cookies, _ := getCookie(sessionkey, recorder)
 	req.AddCookie(cookies)
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store.Init(w, r, false)
-		session, _ := sessions.Get(sessionkey, store)
+		store := sessions.NewCookieStore([]string{"key"})
+
+		session, _ := sessions.New(sessionkey, store, w, r)
+
 		println(session.Values["name"].(string))
-		println(session.Values["num"].(int))
 	})
 	handler.ServeHTTP(recorder, req)
 }

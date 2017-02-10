@@ -3,15 +3,16 @@ package sessions
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 )
 
 // Session stores the values and optional configuration for a session.
 type Session struct {
-	SID    string
+	sid    string
 	Values map[string]interface{}
 	store  Store
 	name   string
-	oldval string
+	//oldval string
 }
 
 // Name returns the name used to register the session
@@ -24,22 +25,26 @@ func (s *Session) Store() Store {
 	return s.store
 }
 
-// Get a session instance by name and any kind of stores
-func Get(name string, store Store) (session *Session, err error) {
+// New a session instance by name and any kind of stores
+func New(name string, store Store, w http.ResponseWriter, r *http.Request, signed ...bool) (session *Session, err error) {
 	session = &Session{
-		Values: make(map[string]interface{}),
-		store:  store,
-		name:   name,
+		store: store,
+		name:  name,
 	}
-	val, err := store.Get(name)
-	if val != "" {
-		session.oldval = val
-		err = Decode(val, &session.Values)
+	var issigned = false
+	if len(signed) > 0 {
+		issigned = signed[0]
+	}
+	store.Init(w, r, issigned)
+	session.Values, err = store.Get(name)
+
+	if session.Values == nil {
+		session.Values = make(map[string]interface{})
 	}
 	return
 }
 
-// New a new session instance by name
+// New a new session instance by name base on current store
 func (s *Session) New(name string) *Session {
 	session := &Session{
 		Values: make(map[string]interface{}),
@@ -50,21 +55,20 @@ func (s *Session) New(name string) *Session {
 }
 
 // Get a new session instance by name base on current store
-func (s *Session) Get(name string) *Session {
-	val, _ := s.store.Get(name)
-	if val != "" {
-		s.oldval = val
-		Decode(val, &s.Values)
+func (s *Session) Get(name string) (session *Session, err error) {
+	session = &Session{
+
+		Values: make(map[string]interface{}),
+		store:  s.store,
+		name:   name,
 	}
-	return s
+	session.Values, err = s.store.Get(session.name)
+	return
 }
 
 // Save is a convenience method to save current session
 func (s *Session) Save() (err error) {
-	encoded, err := Encode(s.Values)
-	if err == nil && s.oldval != encoded {
-		s.store.Save(s.name, encoded)
-	}
+	s.store.Save(s.name, s.Values)
 	return
 }
 
@@ -93,9 +97,11 @@ func Decode(value string, dst interface{}) (err error) {
 
 // Store is an interface for custom session stores.
 type Store interface {
+	Init(w http.ResponseWriter, r *http.Request, signed bool)
+
 	// Get should return a cached session string.
-	Get(name string) (string, error)
+	Get(name string) (map[string]interface{}, error)
 
 	// Save should persist session to the underlying store implementation.
-	Save(name string, data string) error
+	Save(name string, data map[string]interface{}) error
 }

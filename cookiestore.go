@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-http-utils/cookie"
@@ -20,12 +21,14 @@ type Options struct {
 	HTTPOnly bool
 }
 
-// New an CookieStore instance
-func New(Keys ...[]string) (store *CookieStore) {
-	if len(Keys) > 0 && len(Keys[0]) > 0 {
-		store = &CookieStore{keys: Keys[0]}
-	} else {
-		store = &CookieStore{}
+// NewCookieStore an CookieStore instance
+func NewCookieStore(Keys []string, options ...*Options) (store *CookieStore) {
+	if len(Keys) == 0 {
+		panic(errors.New("invalid keys parameter"))
+	}
+	store = &CookieStore{keys: Keys}
+	if len(options) > 0 {
+		store.options = options[0]
 	}
 	return
 }
@@ -39,34 +42,29 @@ type CookieStore struct {
 }
 
 // Init an CookieStore instance
-func (c *CookieStore) Init(w http.ResponseWriter, r *http.Request, signed bool, options ...*Options) {
-	if len(options) > 0 {
-		c.options = options[0]
-	}
-	if len(c.keys) > 0 && len(c.keys[0]) > 0 {
-		c.cookie = cookie.New(w, r, c.keys)
-	} else {
-		c.cookie = cookie.New(w, r)
-	}
+func (c *CookieStore) Init(w http.ResponseWriter, r *http.Request, signed bool) {
+	c.cookie = cookie.New(w, r, c.keys)
 	c.signed = signed
 	return
 }
 
 // Get existed session from Request's cookies
-func (c *CookieStore) Get(name string) (val string, err error) {
-	val, err = c.cookie.Get(name, c.signed)
+func (c *CookieStore) Get(name string) (data map[string]interface{}, err error) {
+	val, _ := c.cookie.Get(name, c.signed)
+	if val != "" {
+		Decode(val, &data)
+	}
 	return
 }
 
 // Save session to Response's cookie
-func (c *CookieStore) Save(name string, data string) error {
+func (c *CookieStore) Save(name string, data map[string]interface{}) (err error) {
 	opts := &cookie.Options{
 		Path:     "/",
 		HTTPOnly: true,
 		Signed:   c.signed,
 		MaxAge:   24 * 60 * 60,
 	}
-	opts.Signed = c.signed
 	if c.options != nil {
 		opts.Path = c.options.Path
 		opts.Domain = c.options.Domain
@@ -74,6 +72,9 @@ func (c *CookieStore) Save(name string, data string) error {
 		opts.Secure = c.options.Secure
 		opts.HTTPOnly = c.options.HTTPOnly
 	}
-	c.cookie.Set(name, data, opts)
-	return nil
+	val, err := Encode(data)
+	if err == nil {
+		c.cookie.Set(name, val, opts)
+	}
+	return
 }

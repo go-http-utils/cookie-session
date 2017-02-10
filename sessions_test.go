@@ -9,18 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGearsession(t *testing.T) {
+func TestSessions(t *testing.T) {
 
 	cookiekey := "teambition"
 	cookieNewKey := "teambition-new"
-	t.Run("gearsession use default options that should be", func(t *testing.T) {
-		store := sessions.New()
+	t.Run("Sessions use default options that should be", func(t *testing.T) {
+
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
 		recorder := httptest.NewRecorder()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, false)
-			session, _ := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"key"})
+			session, _ := sessions.New(cookiekey, store, w, r)
 			session.Values["name"] = "mushroom"
 			session.Values["num"] = 99
 			session.Save()
@@ -38,8 +38,9 @@ func TestGearsession(t *testing.T) {
 		req.AddCookie(cookies)
 
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, false)
-			session, _ := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"key"})
+			session, _ := sessions.New(cookiekey, store, w, r)
+
 			assert.Equal("mushroom", session.Values["name"])
 			assert.Equal(float64(99), session.Values["num"])
 		})
@@ -49,24 +50,24 @@ func TestGearsession(t *testing.T) {
 		req, err = http.NewRequest("GET", "/", nil)
 		req.AddCookie(cookies)
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, false)
-			session, _ := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"key"})
+			session, _ := sessions.New(cookiekey, store, w, r)
+
 			assert.Equal("mushroom", session.Values["name"])
 			assert.Equal(float64(99), session.Values["num"])
 		})
 		handler.ServeHTTP(recorder, req)
 	})
-	store := sessions.New([]string{"key"})
-	t.Run("gearsession with New session that should be", func(t *testing.T) {
+	t.Run("Sessions with New session that should be", func(t *testing.T) {
 		assert := assert.New(t)
 
 		recorder := httptest.NewRecorder()
 
 		req, _ := http.NewRequest("GET", "/", nil)
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, true)
-			session, _ := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"key"})
 
+			session, _ := sessions.New(cookiekey, store, w, r, true)
 			session.Values["name"] = "mushroom"
 			session.Values["num"] = 99
 			session.Save()
@@ -92,40 +93,47 @@ func TestGearsession(t *testing.T) {
 		req.AddCookie(cookies)
 
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, true)
-			session, _ := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"key"})
 
+			session, err := sessions.New(cookiekey, store, w, r, true)
+			assert.Nil(err)
 			assert.Equal("mushroom", session.Values["name"])
 			assert.Equal(float64(99), session.Values["num"])
 
-			session = session.Get(cookieNewKey)
+			session, err = session.Get(cookieNewKey)
+			assert.Nil(err)
 			assert.Equal("teambition-n", session.Values["name"])
 			assert.Equal(float64(100), session.Values["num"])
+
+			session, err = session.Get(cookieNewKey + "new")
+			assert.Nil(err)
+			assert.Equal(0, len(session.Values))
 
 		})
 		handler.ServeHTTP(recorder, req)
 
 	})
-	t.Run("gearsession with Name() and Store()  that should be", func(t *testing.T) {
+	t.Run("Sessions with Name() and Store()  that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		recorder := httptest.NewRecorder()
 
 		req, _ := http.NewRequest("GET", "/", nil)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, false, &sessions.Options{
+
+			store := sessions.NewCookieStore([]string{"key"}, &sessions.Options{
 				Path:     "xxx.com",
 				HTTPOnly: true,
 				MaxAge:   64,
 				Domain:   "ttt.com",
 				Secure:   true,
 			})
-			session, _ := sessions.Get(cookiekey, store)
-
+			session, err := sessions.New(cookiekey, store, w, r)
 			session.Values["name"] = "mushroom"
 			session.Values["num"] = 99
 			session.Save()
 
+			assert.Nil(err)
 			assert.Equal(cookiekey, session.Name())
 			assert.NotNil(session.Store())
 
@@ -139,17 +147,35 @@ func TestGearsession(t *testing.T) {
 		assert.Equal(true, cookies.Secure)
 
 	})
-	t.Run("gearsession with Encode() and Decode()  that should be", func(t *testing.T) {
+	t.Run("Sessions with Encode() and Decode()  that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		dt := make(map[string]interface{})
 		err := sessions.Decode("xx", dt)
 		assert.NotNil(err)
 
+		_, err = sessions.Encode(make(chan int))
+		assert.NotNil(err)
+	})
+
+	t.Run("Sessions with invalid keys parameter that should be", func(t *testing.T) {
+		assert := assert.New(t)
+		recorder := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				r := recover()
+				assert.Equal("invalid keys parameter", r.(error).Error())
+			}()
+			sessions.NewCookieStore([]string{})
+
+		})
+		handler.ServeHTTP(recorder, req)
+
 	})
 
 }
 func TestSessionCompatible(t *testing.T) {
-	store := sessions.New([]string{"tb-accounts"})
 	cookiekey := "TEAMBITION_SESSIONID"
 
 	t.Run("gearsession should be compatible with old session component that should be", func(t *testing.T) {
@@ -159,8 +185,9 @@ func TestSessionCompatible(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/", nil)
 		req.Header.Set("Cookie", "TEAMBITION_SESSIONID=eyJhdXRoVXBkYXRlZCI6MTQ4NTE1ODg3NDgxMywibmV4dFVybCI6Imh0dHA6Ly9wcm9qZWN0LmNpL3Byb2plY3RzIiwidHMiOjE0ODY2MDkzNTA5NjAsInVpZCI6IjU1YzE3MTBkZjk2YmJlODQ3NjgzMjUyYSIsInVzZXIiOnsiYXZhdGFyVXJsIjoiaHR0cDovL3N0cmlrZXIucHJvamVjdC5jaS90aHVtYm5haWwvMDEwa2UyZTMzODQ3ZjQzNzhlY2E4ZTQxMjBkYTFlMjcyZGI5L3cvMjAwL2gvMjAwIiwibmFtZSI6Iumds+aYjDAyIiwiZW1haWwiOiJjaGFuZ0BjaGFuZy5jb20iLCJfaWQiOiI1NWMxNzEwZGY5NmJiZTg0NzY4MzI1MmEiLCJpc05ldyI6dHJ1ZSwicmVnaW9uIjoiY24ifX0=; TEAMBITION_SESSIONID.sig=PfTE50ypOxA4uf09mgP9DR2IjKQ")
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			store.Init(w, r, true)
-			session, err := sessions.Get(cookiekey, store)
+			store := sessions.NewCookieStore([]string{"tb-accounts"})
+
+			session, err := sessions.New(cookiekey, store, w, r, true)
 			assert.Nil(err)
 			assert.Equal(float64(1485158874813), session.Values["authUpdated"])
 			assert.Equal("55c1710df96bbe847683252a", session.Values["uid"])
