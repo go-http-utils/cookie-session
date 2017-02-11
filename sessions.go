@@ -8,11 +8,26 @@ import (
 
 // Session stores the values and optional configuration for a session.
 type Session struct {
-	sid    string
 	Values map[string]interface{}
+	SID    string
 	store  Store
 	name   string
-	//oldval string
+	cache  map[string]interface{}
+	w      http.ResponseWriter
+	req    *http.Request
+}
+
+// NewSession to create new session instance
+func NewSession(name string, store Store, w http.ResponseWriter, r *http.Request) (session *Session) {
+	session = &Session{
+		Values: make(map[string]interface{}),
+		store:  store,
+		name:   name,
+		w:      w,
+		req:    r,
+		cache:  make(map[string]interface{}),
+	}
+	return
 }
 
 // Name returns the name used to register the session
@@ -25,50 +40,37 @@ func (s *Session) Store() Store {
 	return s.store
 }
 
-// New a session instance by name and any kind of stores
-func New(name string, store Store, w http.ResponseWriter, r *http.Request, signed ...bool) (session *Session, err error) {
-	session = &Session{
-		store: store,
-		name:  name,
+// AddCache to add data cache for thirdparty store implement, like store the last value to check whether changed when saving
+func (s *Session) AddCache(key string, val interface{}) {
+	switch v := val.(type) {
+	case map[string]interface{}:
+		s.cache[key] = copyMap(val.(map[string]interface{}))
+	default:
+		s.cache[key] = v
 	}
-	var issigned = false
-	if len(signed) > 0 {
-		issigned = signed[0]
-	}
-	store.Init(w, r, issigned)
-	session.Values, err = store.Get(name)
+}
 
-	if session.Values == nil {
-		session.Values = make(map[string]interface{})
+func copyMap(cache map[string]interface{}) (data map[string]interface{}) {
+	data = make(map[string]interface{})
+	for k, v := range cache {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			data[k] = copyMap(val)
+		default:
+			data[k] = val
+		}
 	}
 	return
 }
 
-// New a new session instance by name base on current store
-func (s *Session) New(name string) *Session {
-	session := &Session{
-		Values: make(map[string]interface{}),
-		store:  s.store,
-		name:   name,
-	}
-	return session
-}
-
-// Get a new session instance by name base on current store
-func (s *Session) Get(name string) (session *Session, err error) {
-	session = &Session{
-
-		Values: make(map[string]interface{}),
-		store:  s.store,
-		name:   name,
-	}
-	session.Values, err = s.store.Get(session.name)
-	return
+// GetCache cache data from current Session
+func (s *Session) GetCache(name string) interface{} {
+	return s.cache[name]
 }
 
 // Save is a convenience method to save current session
 func (s *Session) Save() (err error) {
-	s.store.Save(s.name, s.Values)
+	s.store.Save(s.w, s.req, s)
 	return
 }
 
@@ -97,11 +99,9 @@ func Decode(value string, dst interface{}) (err error) {
 
 // Store is an interface for custom session stores.
 type Store interface {
-	Init(w http.ResponseWriter, r *http.Request, signed bool)
-
 	// Get should return a cached session string.
-	Get(name string) (map[string]interface{}, error)
+	Get(name string, w http.ResponseWriter, r *http.Request) (session *Session, err error)
 
 	// Save should persist session to the underlying store implementation.
-	Save(name string, data map[string]interface{}) error
+	Save(w http.ResponseWriter, r *http.Request, session *Session) error
 }

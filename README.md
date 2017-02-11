@@ -14,18 +14,24 @@ Use cookie as session, base on [secure cookie](https://github.com/go-http-utils/
 * Interfaces and infrastructure for custom session backends: sessions from
   different stores can be retrieved and batch-saved using a common API.
 
+##Installation
+```go
+go get github.com/go-http-utils/cookie-session
+```
 ##Examples
 ```go
 go run cookiesession/main.go
 ```
 ##Usage
 ```go
-    store := sessions.New([]string{"key"})
+    store := sessions.NewCookieStore([]string{"key"})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		store.Init(w, r, false)
-		session, _ := sessions.Get(sessionkey, store)
-		session.Values["name"] = "mushroom"
-		println(session.Values["name"].(string)) //get session
+	  	session, _ := store.Get(sessionkey, w, r)
+		if val, ok := session.Values["name"]; ok {
+			println(val)
+		} else {
+			session.Values["name"] = "mushroom"
+		}
 		session.Save()
 	})
 ```

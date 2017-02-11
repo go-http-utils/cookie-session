@@ -1,8 +1,8 @@
 package sessions
 
 import (
-	"errors"
 	"net/http"
+	"reflect"
 
 	"github.com/go-http-utils/cookie"
 )
@@ -22,43 +22,42 @@ type Options struct {
 }
 
 // NewCookieStore an CookieStore instance
-func NewCookieStore(Keys []string, options ...*Options) (store *CookieStore) {
-	if len(Keys) == 0 {
-		panic(errors.New("invalid keys parameter"))
-	}
-	store = &CookieStore{keys: Keys}
+func NewCookieStore(keys []string, options ...*Options) (store *CookieStore) {
+	store = &CookieStore{keys: keys}
 	if len(options) > 0 {
 		store.options = options[0]
+	}
+	if len(keys) > 0 && len(keys[0]) > 0 {
+		store.signed = true
 	}
 	return
 }
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	cookie  *cookie.Cookies
 	options *Options
 	keys    []string
-	signed  bool // optional
+	signed  bool
 }
 
-// Init an CookieStore instance
-func (c *CookieStore) Init(w http.ResponseWriter, r *http.Request, signed bool) {
-	c.cookie = cookie.New(w, r, c.keys)
-	c.signed = signed
-	return
-}
-
-// Get existed session from Request's cookies
-func (c *CookieStore) Get(name string) (data map[string]interface{}, err error) {
-	val, _ := c.cookie.Get(name, c.signed)
+// Get a session instance by name and any kind of stores
+func (c *CookieStore) Get(name string, w http.ResponseWriter, r *http.Request) (session *Session, err error) {
+	cookie := cookie.New(w, r, c.keys)
+	session = NewSession(name, c, w, r)
+	val, _ := cookie.Get(name, c.signed)
 	if val != "" {
-		Decode(val, &data)
+		Decode(val, &session.Values)
 	}
+	session.AddCache("cookie", cookie)
+	session.AddCache("lastvalue", session.Values)
 	return
 }
 
 // Save session to Response's cookie
-func (c *CookieStore) Save(name string, data map[string]interface{}) (err error) {
+func (c *CookieStore) Save(w http.ResponseWriter, r *http.Request, session *Session) (err error) {
+	if reflect.DeepEqual(session.GetCache("lastvalue"), session.Values) {
+		return
+	}
 	opts := &cookie.Options{
 		Path:     "/",
 		HTTPOnly: true,
@@ -72,9 +71,9 @@ func (c *CookieStore) Save(name string, data map[string]interface{}) (err error)
 		opts.Secure = c.options.Secure
 		opts.HTTPOnly = c.options.HTTPOnly
 	}
-	val, err := Encode(data)
+	val, err := Encode(session.Values)
 	if err == nil {
-		c.cookie.Set(name, val, opts)
+		session.GetCache("cookie").(*cookie.Cookies).Set(session.Name(), val, opts)
 	}
 	return
 }
