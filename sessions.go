@@ -1,11 +1,8 @@
 package sessions
 
 import (
-	"crypto/rand"
-	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
-	"io"
 
 	"github.com/go-http-utils/cookie"
 )
@@ -19,7 +16,7 @@ type Store interface {
 // Sessions ...
 type Sessions interface {
 	// Init sets current cookie.Cookies and Store to the session instance.
-	Init(name, sid string, c *cookie.Cookies, store Store)
+	Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string)
 	// GetSID returns the session' sid
 	GetSID() string
 	// GetName returns the session' name
@@ -28,85 +25,77 @@ type Sessions interface {
 	GetStore() Store
 	// GetCookie returns the session' cookie
 	GetCookie() *cookie.Cookies
+	// IsChanged to check current session's value whether is changed
+	IsChanged(val string) bool
+	// IsNew to check the current session whether it's new user
+	IsNew() bool
 }
 
-// Meta implements Sessions interface.
-// You can define a custom Session type and embed Meta type:
-//
-//  type Session struct {
-//  	*Meta  `json:"-"`
-//  	UserID string `json:"userId"`
-//  	Name   string `json:"name"`
-//  	Authed int64  `json:"authed"`
-//  }
-//
-//  func (s *Session) IsNew() bool {
-//  	return s.GetSID() == ""
-//  }
-//
-//  func (s *Session) Save() error {
-//  	return s.GetStore().Save(s)
-//  }
-//
+// Meta stores the values and optional configuration for a session.
 type Meta struct {
-	name, sid string
-	store     Store
-	cookie    *cookie.Cookies
+	// Values map[string]interface{}
+	sid      string
+	store    Store
+	name     string
+	cookie   *cookie.Cookies
+	lastvale string
 }
 
-// GetName implements Session interface
-func (m *Meta) GetName() string {
-	return m.name
+// Init sets current cookie.Cookies and Store to the session instance.
+func (s *Meta) Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string) {
+	s.name = name
+	s.sid = sid
+	s.cookie = c
+	s.store = store
+	s.lastvale = lastvalue
 }
 
-// GetSID implements Session interface
-func (m *Meta) GetSID() string {
-	return m.sid
+// GetSID returns the session' sid
+func (s *Meta) GetSID() string {
+	return s.sid
 }
 
-// GetStore implements Session interface
-func (m *Meta) GetStore() Store {
-	return m.store
+// GetName returns the name used to register the session
+func (s *Meta) GetName() string {
+	return s.name
 }
 
-// GetCookie implements Session interface
-func (m *Meta) GetCookie() *cookie.Cookies {
-	return m.cookie
+// GetStore returns the session store used to register the session
+func (s *Meta) GetStore() Store {
+	return s.store
 }
 
-// Init implements Session interface
-func (m *Meta) Init(name, sid string, c *cookie.Cookies, store Store) {
-	m.name = name
-	m.sid = sid
-	m.cookie = c
-	m.store = store
+// GetCookie returns the session' cookie
+func (s *Meta) GetCookie() *cookie.Cookies {
+	return s.cookie
 }
 
-// Encode the session to string by Serializer and Base64
-func Encode(session interface{}) (string, error) {
-	b, err := json.Marshal(session)
+// IsChanged to check current session's value whether is changed
+func (s *Meta) IsChanged(val string) bool {
+	return s.lastvale != val
+}
+
+// IsNew to check the current session whether it's new user
+func (s *Meta) IsNew() bool {
+	return s.sid == ""
+}
+
+// Encode the value by Serializer and Base64
+func Encode(value interface{}) (str string, err error) {
+	b, err := json.Marshal(value)
 	if err != nil {
-		return "", err
+		return
 	}
-	return base64.StdEncoding.EncodeToString(b), nil
+	str = base64.StdEncoding.EncodeToString(b)
+	return
 }
 
-// Decode the string value to session.
-func Decode(val string, session interface{}) error {
-	b, err := base64.StdEncoding.DecodeString(val)
-	if err == nil {
-		err = json.Unmarshal(b, session)
+// Decode the value to dst .
+func Decode(value string, dst interface{}) (err error) {
+	b, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return err
 	}
-	return err
-}
-
-// RandSID ...
-func RandSID(seed string) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(seed))
-
-	buf := make([]byte, 16)
-	io.ReadFull(rand.Reader, buf)
-	hasher.Write(buf)
-	return base64.RawURLEncoding.EncodeToString(hasher.Sum(nil))
+	err = json.Unmarshal(b, dst)
+	return
 }

@@ -4,48 +4,63 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/go-http-utils/cookie"
 	"github.com/go-http-utils/cookie-session"
 )
 
+// Session ...
+type Session struct {
+	*sessions.Meta `json:"-"`
+	UserID         string `json:"userId"`
+	Name           string `json:"name"`
+	Authed         int64  `json:"authed"`
+}
+
+// Save ...
+func (s *Session) Save() error {
+	return s.GetStore().Save(s)
+}
+
 func main() {
-
-	sessionkey := "sessionid"
-
-	store := sessions.NewCookieStore([]string{})
-
-	req, _ := http.NewRequest("GET", "/", nil)
+	SessionName := "Sess"
+	SessionKeys := []string{"keyxxx"}
 
 	recorder := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+
+	store := sessions.New()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(sessionkey, w, r)
-		if val, ok := session.Values["name"]; ok {
-			println(val)
-		} else {
-			session.Values["name"] = "mushroom"
+
+		session := &Session{Meta: &sessions.Meta{}}
+		store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+		if session.UserID == "" {
+			session.UserID = "x"
+			session.Name = "y"
+			session.Authed = 1
 		}
 		session.Save()
 	})
 	handler.ServeHTTP(recorder, req)
 
 	//======reuse=====
-	store = sessions.NewCookieStore([]string{})
-	cookies, _ := getCookie(sessionkey, recorder)
-	req.AddCookie(cookies)
+	req, _ = http.NewRequest("GET", "/", nil)
+	migrateCookies(recorder, req)
+
+	store = sessions.New()
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session := &Session{Meta: &sessions.Meta{}}
+		store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
 
-		session, _ := store.Get(sessionkey, w, r)
+		println(session.UserID)
+		println(session.Name)
+		println(session.Authed)
 
-		println(session.Values["name"].(string))
+		session.Save()
 	})
 	handler.ServeHTTP(recorder, req)
 }
-func getCookie(name string, recorder *httptest.ResponseRecorder) (*http.Cookie, error) {
-	var err error
-	res := &http.Response{Header: http.Header{"Set-Cookie": recorder.HeaderMap["Set-Cookie"]}}
-	for _, val := range res.Cookies() {
-		if val.Name == name {
-			return val, nil
-		}
+func migrateCookies(recorder *httptest.ResponseRecorder, req *http.Request) {
+	for _, cookie := range recorder.Result().Cookies() {
+		req.AddCookie(cookie)
 	}
-	return nil, err
 }
