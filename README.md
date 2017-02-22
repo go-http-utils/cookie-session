@@ -13,6 +13,7 @@ Use cookie as session, base on [secure cookie](https://github.com/go-http-utils/
 * Multiple sessions per request, even using different backends.
 * Interfaces and infrastructure for custom session backends: sessions from
   different stores can be retrieved and batch-saved using a common API.
+* User can customize own session with different field that don't require type assertion and cast
 
 ##Installation
 ```go
@@ -20,20 +21,37 @@ go get github.com/go-http-utils/cookie-session
 ```
 ##Examples
 ```go
-go run cookiesession/main.go
+go run example/main.go
 ```
 ##Usage
 ```go
-    store := sessions.NewCookieStore([]string{"key"})
+// Session is custom by user's business
+type Session struct {
+	*sessions.Meta `json:"-"`
+	UserID         string `json:"userId"`
+	Name           string `json:"name"`
+	Authed         int64  `json:"authed"`
+}
+
+func (s *Session) Save() error {
+	return s.SaveIt(s)
+}
+func main() {
+	SessionName := "Sess"
+	SessionKeys := []string{"keyxxx"}
+
+    store := sessions.New()
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	  	session, _ := store.Get(sessionkey, w, r)
-		if val, ok := session.Values["name"]; ok {
-			println(val)
-		} else {
-			session.Values["name"] = "mushroom"
+	    session := &Session{Meta: &sessions.Meta{}}
+		store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+		if session.UserID == "" {
+			session.UserID = "x"
+			session.Name = "y"
+			session.Authed = 1
 		}
 		session.Save()
 	})
 ```
-##Store Implementations
+##Other Store Implementations
 - https://github.com/mushroomsir/session-redis -Redis

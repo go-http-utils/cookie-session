@@ -1,11 +1,6 @@
 package sessions
 
-import (
-	"net/http"
-	"reflect"
-
-	"github.com/go-http-utils/cookie"
-)
+import "github.com/go-http-utils/cookie"
 
 // Options stores configuration for a session or session store.
 //
@@ -21,59 +16,50 @@ type Options struct {
 	HTTPOnly bool
 }
 
-// NewCookieStore an CookieStore instance
-func NewCookieStore(keys []string, options ...*Options) (store *CookieStore) {
-	store = &CookieStore{keys: keys}
-	if len(options) > 0 {
-		store.options = options[0]
+var (
+	lastSessionValue = "lastSessionValue"
+)
+
+// New an CookieStore instance
+func New(options ...*Options) (store *CookieStore) {
+	opts := &cookie.Options{
+		Path:     "/",
+		HTTPOnly: true,
+		Signed:   true,
+		MaxAge:   24 * 60 * 60,
 	}
-	if len(keys) > 0 && len(keys[0]) > 0 {
-		store.signed = true
+	if len(options) > 0 && options[0] != nil {
+		temp := options[0]
+		opts.Path = temp.Path
+		opts.Domain = temp.Domain
+		opts.MaxAge = temp.MaxAge
+		opts.Secure = temp.Secure
+		opts.HTTPOnly = temp.HTTPOnly
 	}
+	store = &CookieStore{opts}
 	return
 }
 
 // CookieStore stores sessions using secure cookies.
 type CookieStore struct {
-	options *Options
-	keys    []string
-	signed  bool
+	opts *cookie.Options
 }
 
-// Get a session instance by name and any kind of stores
-func (c *CookieStore) Get(name string, w http.ResponseWriter, r *http.Request) (session *Session, err error) {
-	cookie := cookie.New(w, r, c.keys)
-	session = NewSession(name, c, w, r)
-	val, _ := cookie.Get(name, c.signed)
+// Load a session by name and any kind of stores
+func (c *CookieStore) Load(name string, session Sessions, cookie *cookie.Cookies) error {
+	val, err := cookie.Get(name, c.opts.Signed)
 	if val != "" {
-		Decode(val, &session.Values)
+		Decode(val, &session)
 	}
-	session.AddCache("cookie", cookie)
-	session.AddCache("lastvalue", session.Values)
-	return
+	session.Init(name, val, cookie, c, val)
+	return err
 }
 
 // Save session to Response's cookie
-func (c *CookieStore) Save(w http.ResponseWriter, r *http.Request, session *Session) (err error) {
-	if reflect.DeepEqual(session.GetCache("lastvalue"), session.Values) {
-		return
-	}
-	opts := &cookie.Options{
-		Path:     "/",
-		HTTPOnly: true,
-		Signed:   c.signed,
-		MaxAge:   24 * 60 * 60,
-	}
-	if c.options != nil {
-		opts.Path = c.options.Path
-		opts.Domain = c.options.Domain
-		opts.MaxAge = c.options.MaxAge
-		opts.Secure = c.options.Secure
-		opts.HTTPOnly = c.options.HTTPOnly
-	}
-	val, err := Encode(session.Values)
-	if err == nil {
-		session.GetCache("cookie").(*cookie.Cookies).Set(session.Name(), val, opts)
+func (c *CookieStore) Save(session Sessions) (err error) {
+	val, err := Encode(session)
+	if err == nil && session.IsChanged(val) {
+		session.GetCookie().Set(session.GetName(), val, c.opts)
 	}
 	return
 }

@@ -3,86 +3,89 @@ package sessions
 import (
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
+
+	"github.com/go-http-utils/cookie"
 )
 
-// Session stores the values and optional configuration for a session.
-type Session struct {
-	Values map[string]interface{}
-	SID    string
-	store  Store
-	name   string
-	cache  map[string]interface{}
-	w      http.ResponseWriter
-	req    *http.Request
+// Store is an interface for custom session stores.
+type Store interface {
+	// Save should persist session to the underlying store implementation.
+	Save(session Sessions) error
 }
 
-// NewSession to create new session instance
-func NewSession(name string, store Store, w http.ResponseWriter, r *http.Request) (session *Session) {
-	session = &Session{
-		Values: make(map[string]interface{}),
-		store:  store,
-		name:   name,
-		w:      w,
-		req:    r,
-		cache:  make(map[string]interface{}),
-	}
-	return
+// Sessions ...
+type Sessions interface {
+	// Init sets current cookie.Cookies and Store to the session instance.
+	Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string)
+	// GetSID returns the session' sid
+	GetSID() string
+	// GetName returns the session' name
+	GetName() string
+	// GetStore returns the session' store
+	GetStore() Store
+	// GetCookie returns the session' cookie
+	GetCookie() *cookie.Cookies
+	// IsChanged to check current session's value whether is changed
+	IsChanged(val string) bool
+	// IsNew to check the current session whether it's new user
+	IsNew() bool
 }
 
-// Name returns the name used to register the session
-func (s *Session) Name() string {
+// Meta stores the values and optional configuration for a session.
+type Meta struct {
+	// Values map[string]interface{}
+	sid      string
+	store    Store
+	name     string
+	cookie   *cookie.Cookies
+	lastvale string
+}
+
+// Init sets current cookie.Cookies and Store to the session instance.
+func (s *Meta) Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string) {
+	s.name = name
+	s.sid = sid
+	s.cookie = c
+	s.store = store
+	s.lastvale = lastvalue
+}
+
+// GetSID returns the session' sid
+func (s *Meta) GetSID() string {
+	return s.sid
+}
+
+// GetName returns the name used to register the session
+func (s *Meta) GetName() string {
 	return s.name
 }
 
-// Store returns the session store used to register the session
-func (s *Session) Store() Store {
+// GetStore returns the session store used to register the session
+func (s *Meta) GetStore() Store {
 	return s.store
 }
 
-// AddCache to add data cache for thirdparty store implement, like store the last value to check whether changed when saving
-func (s *Session) AddCache(key string, val interface{}) {
-	switch v := val.(type) {
-	case map[string]interface{}:
-		s.cache[key] = copyMap(val.(map[string]interface{}))
-	default:
-		s.cache[key] = v
-	}
+// GetCookie returns the session' cookie
+func (s *Meta) GetCookie() *cookie.Cookies {
+	return s.cookie
 }
 
-func copyMap(cache map[string]interface{}) (data map[string]interface{}) {
-	data = make(map[string]interface{})
-	for k, v := range cache {
-		switch val := v.(type) {
-		case map[string]interface{}:
-			data[k] = copyMap(val)
-		default:
-			data[k] = val
-		}
-	}
-	return
+// IsChanged to check current session's value whether is changed
+func (s *Meta) IsChanged(val string) bool {
+	return s.lastvale != val
 }
 
-// GetCache cache data from current Session
-func (s *Session) GetCache(name string) interface{} {
-	return s.cache[name]
-}
-
-// Save is a convenience method to save current session
-func (s *Session) Save() (err error) {
-	s.store.Save(s.w, s.req, s)
-	return
+// IsNew to check the current session whether it's new user
+func (s *Meta) IsNew() bool {
+	return s.sid == ""
 }
 
 // Encode the value by Serializer and Base64
 func Encode(value interface{}) (str string, err error) {
-
-	//Serializer
 	b, err := json.Marshal(value)
 	if err != nil {
 		return
 	}
-	//Base64
 	str = base64.StdEncoding.EncodeToString(b)
 	return
 }
@@ -95,13 +98,4 @@ func Decode(value string, dst interface{}) (err error) {
 	}
 	err = json.Unmarshal(b, dst)
 	return
-}
-
-// Store is an interface for custom session stores.
-type Store interface {
-	// Get should return a cached session string.
-	Get(name string, w http.ResponseWriter, r *http.Request) (session *Session, err error)
-
-	// Save should persist session to the underlying store implementation.
-	Save(w http.ResponseWriter, r *http.Request, session *Session) error
 }

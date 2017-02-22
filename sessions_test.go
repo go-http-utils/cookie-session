@@ -5,56 +5,78 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-http-utils/cookie"
 	"github.com/go-http-utils/cookie-session"
 	"github.com/stretchr/testify/assert"
 )
 
+// Session ...
+type Session struct {
+	*sessions.Meta `json:"-"`
+	Name           string `json:"name"`
+	Age            int64  `json:"age"`
+	Authed         int64  `json:"authed"`
+}
+
+// Save ...
+func (s *Session) Save() error {
+	return s.GetStore().Save(s)
+}
 func TestSessions(t *testing.T) {
 
-	cookiekey := "teambition"
-	cookieNewKey := "teambition-new"
+	SessionName := "teambition"
+	NewSessionName := "teambition-new"
+	SessionKeys := []string{"keyxxx"}
+
 	t.Run("Sessions use default options that should be", func(t *testing.T) {
-		store := sessions.NewCookieStore([]string{})
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
 		recorder := httptest.NewRecorder()
+
+		store := sessions.New()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			session, _ := store.Get(cookiekey, w, r)
-			session.Values["name"] = "mushroom"
-			session.Values["num"] = 99
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroom"
+			session.Age = 99
 			err = session.Save()
 			assert.Nil(err)
+			assert.True(session.IsNew())
+			assert.True(session.GetSID() == "")
 		})
 		handler.ServeHTTP(recorder, req)
 
-		//======reuse=====
-		store = sessions.NewCookieStore([]string{})
-		cookies, err := getCookie(cookiekey, recorder)
-		assert.Nil(err)
-		assert.NotNil(cookies.Value)
+		//====== reuse session =====
 		req, err = http.NewRequest("GET", "/", nil)
+		migrateCookies(recorder, req)
 
-		req.AddCookie(cookies)
-
+		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, _ := store.Get(cookiekey, w, r)
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
 
-			assert.Equal("mushroom", session.Values["name"])
-			assert.Equal(float64(99), session.Values["num"])
+			assert.Equal("mushroom", session.Name)
+			assert.Equal(int64(99), session.Age)
+			assert.False(session.IsNew())
+			assert.True(session.GetSID() != "")
 		})
 		handler.ServeHTTP(recorder, req)
 
-		//======reuse=====
-		store = sessions.NewCookieStore([]string{})
+		//====== reuse session=====
+
 		req, err = http.NewRequest("GET", "/", nil)
-		req.AddCookie(cookies)
+		migrateCookies(recorder, req)
+
+		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
 
-			session, _ := store.Get(cookiekey, w, r)
-
-			assert.Equal("mushroom", session.Values["name"])
-			assert.Equal(float64(99), session.Values["num"])
+			assert.Equal("mushroom", session.Name)
+			assert.Equal(int64(99), session.Age)
+			assert.False(session.IsNew())
+			assert.True(session.GetSID() != "")
 		})
 		handler.ServeHTTP(recorder, req)
 	})
@@ -63,50 +85,40 @@ func TestSessions(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/", nil)
 
-		store := sessions.NewCookieStore([]string{"key"})
-
+		store := sessions.New()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := store.Get(cookiekey, w, r)
-			session.Values["name"] = "mushroom"
-			session.Values["num"] = 99
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroom"
+			session.Age = 99
 			session.Save()
-			assert.Nil(err)
-			session, err = store.Get(cookieNewKey, w, r)
-			session.Values["name"] = "teambition-n"
-			session.Values["num"] = 100
+
+			session = &Session{Meta: &sessions.Meta{}}
+			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroomnew"
+			session.Age = 100
 			session.Save()
-			assert.Nil(err)
+
 		})
 		handler.ServeHTTP(recorder, req)
 
-		//======reuse=====
-		store = sessions.NewCookieStore([]string{"key"})
+		//====== reuse session =====
 		req, _ = http.NewRequest("GET", "/", nil)
-		cookies, _ := getCookie(cookiekey, recorder)
-		req.AddCookie(cookies)
-		cookies, _ = getCookie(cookiekey+".sig", recorder)
-		req.AddCookie(cookies)
+		migrateCookies(recorder, req)
 
-		cookies, _ = getCookie(cookieNewKey, recorder)
-		req.AddCookie(cookies)
-		cookies, _ = getCookie(cookieNewKey+".sig", recorder)
-		req.AddCookie(cookies)
-
+		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := store.Get(cookiekey, w, r)
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
 
-			assert.Nil(err)
-			assert.Equal("mushroom", session.Values["name"])
-			assert.Equal(float64(99), session.Values["num"])
+			assert.Equal("mushroom", session.Name)
+			assert.Equal(int64(99), session.Age)
 
-			session, err = store.Get(cookieNewKey, w, r)
-			assert.Nil(err)
-			assert.Equal("teambition-n", session.Values["name"])
-			assert.Equal(float64(100), session.Values["num"])
+			session = &Session{Meta: &sessions.Meta{}}
+			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys))
 
-			session, err = store.Get(cookieNewKey+"new", w, r)
-			assert.Nil(err)
-			assert.Equal(0, len(session.Values))
+			assert.Equal("mushroomnew", session.Name)
+			assert.Equal(int64(100), session.Age)
 
 		})
 		handler.ServeHTTP(recorder, req)
@@ -117,7 +129,7 @@ func TestSessions(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/", nil)
 
-		store := sessions.NewCookieStore([]string{"key"}, &sessions.Options{
+		store := sessions.New(&sessions.Options{
 			Path:     "xxx.com",
 			HTTPOnly: true,
 			MaxAge:   64,
@@ -127,18 +139,19 @@ func TestSessions(t *testing.T) {
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			session, err := store.Get(cookiekey, w, r)
-			session.Values["name"] = "mushroom"
-			session.Values["num"] = 99
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroom"
+			session.Age = 99
+
 			session.Save()
 
-			assert.Nil(err)
-			assert.Equal(cookiekey, session.Name())
-			assert.NotNil(session.Store())
+			assert.Equal(SessionName, session.GetName())
+			assert.NotNil(session.GetStore())
 
 		})
 		handler.ServeHTTP(recorder, req)
-		cookies, _ := getCookie(cookiekey, recorder)
+		cookies, _ := getCookie(SessionName, recorder)
 		assert.Equal("ttt.com", cookies.Domain)
 		assert.Equal("xxx.com", cookies.Path)
 		assert.Equal(true, cookies.HttpOnly)
@@ -158,40 +171,58 @@ func TestSessions(t *testing.T) {
 	t.Run("Sessions donn't override old value when seting same value that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
+		assert.Nil(err)
 		recorder := httptest.NewRecorder()
 
-		store := sessions.NewCookieStore([]string{})
-
+		store := sessions.New()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := store.Get(cookiekey, w, r)
-			session.Values["name"] = "mushroom"
-			session.Values["num"] = 99
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroom"
+			session.Age = 99
+
 			session.Save()
-			assert.Nil(err)
 		})
 		handler.ServeHTTP(recorder, req)
 
-		//======reuse=====
-		store = sessions.NewCookieStore([]string{})
-		cookies, err := getCookie(cookiekey, recorder)
-		assert.Nil(err)
-		assert.NotNil(cookies.Value)
+		//====== reuse session =====
 		req, err = http.NewRequest("GET", "/", nil)
+		migrateCookies(recorder, req)
 
-		req.AddCookie(cookies)
-
+		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := store.Get(cookiekey, w, r)
+			session := &Session{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			session.Name = "mushroom"
+			session.Age = 99
 			session.Save()
-			assert.Nil(err)
 		})
 		handler.ServeHTTP(recorder, req)
 	})
-
 }
+
+// User ...
+type User struct {
+	AvatarURL string `json:"avatarUrl"`
+	IsNe      bool   `json:"isNew"`
+	ID        string `json:"_id"`
+}
+
+// TbSession ...
+type TbSession struct {
+	*sessions.Meta `json:"-"`
+	AuthUpdated    int64  `json:"authUpdated"`
+	NextURL        string `json:"nextUrl"`
+	TS             int64  `json:"ts"`
+	UID            string `json:"uid"`
+	User           User   `json:"user"`
+}
+
 func TestSessionCompatible(t *testing.T) {
-	cookiekey := "TEAMBITION_SESSIONID"
-	store := sessions.NewCookieStore([]string{"tb-accounts"})
+	SessionName := "TEAMBITION_SESSIONID"
+	SessionKeys := []string{"tb-accounts"}
+
+	store := sessions.New()
 
 	t.Run("gearsession should be compatible with old session component that should be", func(t *testing.T) {
 		assert := assert.New(t)
@@ -201,15 +232,17 @@ func TestSessionCompatible(t *testing.T) {
 		req.Header.Set("Cookie", "TEAMBITION_SESSIONID=eyJhdXRoVXBkYXRlZCI6MTQ4NTE1ODg3NDgxMywibmV4dFVybCI6Imh0dHA6Ly9wcm9qZWN0LmNpL3Byb2plY3RzIiwidHMiOjE0ODY2MDkzNTA5NjAsInVpZCI6IjU1YzE3MTBkZjk2YmJlODQ3NjgzMjUyYSIsInVzZXIiOnsiYXZhdGFyVXJsIjoiaHR0cDovL3N0cmlrZXIucHJvamVjdC5jaS90aHVtYm5haWwvMDEwa2UyZTMzODQ3ZjQzNzhlY2E4ZTQxMjBkYTFlMjcyZGI5L3cvMjAwL2gvMjAwIiwibmFtZSI6Iumds+aYjDAyIiwiZW1haWwiOiJjaGFuZ0BjaGFuZy5jb20iLCJfaWQiOiI1NWMxNzEwZGY5NmJiZTg0NzY4MzI1MmEiLCJpc05ldyI6dHJ1ZSwicmVnaW9uIjoiY24ifX0=; TEAMBITION_SESSIONID.sig=PfTE50ypOxA4uf09mgP9DR2IjKQ")
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			session, err := store.Get(cookiekey, w, r)
-			assert.Nil(err)
-			assert.Equal(float64(1485158874813), session.Values["authUpdated"])
-			assert.Equal("55c1710df96bbe847683252a", session.Values["uid"])
-			q := session.Values["user"].(map[string]interface{})
+			session := &TbSession{Meta: &sessions.Meta{}}
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
 
-			assert.Equal(true, q["isNew"])
-			assert.Equal(cookiekey, session.Name())
-			assert.NotNil(session.Store())
+			assert.Equal(int64(1485158874813), session.AuthUpdated)
+			assert.Equal("http://project.ci/projects", session.NextURL)
+			assert.Equal(int64(1486609350960), session.TS)
+			assert.Equal("55c1710df96bbe847683252a", session.UID)
+
+			assert.Equal("http://striker.project.ci/thumbnail/010ke2e33847f4378eca8e4120da1e272db9/w/200/h/200", session.User.AvatarURL)
+			assert.Equal("55c1710df96bbe847683252a", session.User.ID)
+			assert.Equal(true, session.User.IsNe)
 		})
 		handler.ServeHTTP(recorder, req)
 	})
@@ -223,4 +256,9 @@ func getCookie(name string, recorder *httptest.ResponseRecorder) (*http.Cookie, 
 		}
 	}
 	return nil, err
+}
+func migrateCookies(recorder *httptest.ResponseRecorder, req *http.Request) {
+	for _, cookie := range recorder.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
 }
