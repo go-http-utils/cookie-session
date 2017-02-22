@@ -16,11 +16,7 @@ type Options struct {
 	HTTPOnly bool
 }
 
-var (
-	lastSessionValue = "lastSessionValue"
-)
-
-// New an CookieStore instance
+// New returns an CookieStore instance
 func New(options ...*Options) (store *CookieStore) {
 	opts := &cookie.Options{
 		Path:     "/",
