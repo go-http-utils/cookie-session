@@ -9,6 +9,10 @@ import (
 
 // Store is an interface for custom session stores.
 type Store interface {
+	// Load should load data from cookie and store, set it into session instance.
+	// error indicates that session validation failed, or other thing.
+	// Sessions.Init should be called in Load, even if error occured.
+	Load(name string, session Sessions, cookie *cookie.Cookies) error
 	// Save should persist session to the underlying store implementation.
 	Save(session Sessions) error
 }

@@ -37,7 +37,7 @@ func TestSessions(t *testing.T) {
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroom"
 			session.Age = 99
 			err = session.Save()
@@ -54,7 +54,7 @@ func TestSessions(t *testing.T) {
 		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 
 			assert.Equal("mushroom", session.Name)
 			assert.Equal(int64(99), session.Age)
@@ -71,7 +71,7 @@ func TestSessions(t *testing.T) {
 		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 
 			assert.Equal("mushroom", session.Name)
 			assert.Equal(int64(99), session.Age)
@@ -88,13 +88,13 @@ func TestSessions(t *testing.T) {
 		store := sessions.New()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroom"
 			session.Age = 99
 			session.Save()
 
 			session = &Session{Meta: &sessions.Meta{}}
-			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroomnew"
 			session.Age = 100
 			session.Save()
@@ -109,13 +109,13 @@ func TestSessions(t *testing.T) {
 		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 
 			assert.Equal("mushroom", session.Name)
 			assert.Equal(int64(99), session.Age)
 
 			session = &Session{Meta: &sessions.Meta{}}
-			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(NewSessionName, session, cookie.New(w, r, SessionKeys...))
 
 			assert.Equal("mushroomnew", session.Name)
 			assert.Equal(int64(100), session.Age)
@@ -140,7 +140,7 @@ func TestSessions(t *testing.T) {
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroom"
 			session.Age = 99
 
@@ -177,7 +177,7 @@ func TestSessions(t *testing.T) {
 		store := sessions.New()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroom"
 			session.Age = 99
 
@@ -192,7 +192,7 @@ func TestSessions(t *testing.T) {
 		store = sessions.New()
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 			session.Name = "mushroom"
 			session.Age = 99
 			session.Save()
@@ -233,7 +233,7 @@ func TestSessionCompatible(t *testing.T) {
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			session := &TbSession{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys))
+			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
 
 			assert.Equal(int64(1485158874813), session.AuthUpdated)
 			assert.Equal("http://project.ci/projects", session.NextURL)
