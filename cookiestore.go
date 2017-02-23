@@ -6,11 +6,8 @@ import "github.com/go-http-utils/cookie"
 //
 // Fields are a subset of http.Cookie fields.
 type Options struct {
-	Path   string
-	Domain string
-	// MaxAge=0 means no 'Max-Age' attribute specified.
-	// MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'.
-	// MaxAge>0 means Max-Age attribute present and given in seconds.
+	Path     string
+	Domain   string
 	MaxAge   int
 	Secure   bool
 	HTTPOnly bool
@@ -45,8 +42,9 @@ type CookieStore struct {
 func (c *CookieStore) Load(name string, session Sessions, cookie *cookie.Cookies) error {
 	val, err := cookie.Get(name, c.opts.Signed)
 	if val != "" {
-		Decode(val, &session)
+		err = Decode(val, &session)
 	}
+	// should call Init even if err
 	session.Init(name, val, cookie, c, val)
 	return err
 }
