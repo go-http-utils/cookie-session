@@ -237,6 +237,8 @@ func TestMemoryStore(t *testing.T) {
 			assert.Equal(int64(0), session.Age)
 		})
 		handler.ServeHTTP(recorder, req)
+
+		store.Destroy()
 	})
 }
 func genID() string {

@@ -2,10 +2,12 @@ package sessions
 
 import (
 	"crypto/rand"
-	"fmt"
-	"io"
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 	"time"
+
+	"io"
 
 	"github.com/go-http-utils/cookie"
 )
@@ -26,7 +28,13 @@ func NewMemoryStore(options ...*Options) (store *MemoryStore) {
 		opts.Secure = temp.Secure
 		opts.HTTPOnly = temp.HTTPOnly
 	}
-	store = &MemoryStore{opts: opts, ticker: time.NewTicker(time.Second), store: make(map[string]*sessionValue)}
+	store = &MemoryStore{
+		opts:   opts,
+		ticker: time.NewTicker(time.Second),
+		store:  make(map[string]*sessionValue),
+		done:   make(chan bool, 1),
+	}
+
 	go store.cleanCache()
 	return
 }
@@ -42,6 +50,7 @@ type MemoryStore struct {
 	store  map[string]*sessionValue
 	ticker *time.Ticker
 	lock   sync.Mutex
+	done   chan bool
 }
 
 // Load a session by name and any kind of stores
@@ -70,7 +79,7 @@ func (m *MemoryStore) Save(session Sessions) (err error) {
 	}
 	sid := session.GetSID()
 	if sid == "" {
-		sid, _ = newUUID()
+		sid = NewSID(val)
 	}
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -88,9 +97,21 @@ func (m *MemoryStore) Len() int {
 	defer m.lock.Unlock()
 	return len(m.store)
 }
+
+// Destroy goroutine cleanCache thread
+func (m *MemoryStore) Destroy() {
+	close(m.done)
+}
+
 func (m *MemoryStore) cleanCache() {
-	for range m.ticker.C {
-		m.clean()
+	defer m.ticker.Stop()
+	for {
+		select {
+		case <-m.ticker.C:
+			m.clean()
+		case <-m.done:
+			return
+		}
 	}
 }
 func (m *MemoryStore) clean() {
@@ -122,11 +143,10 @@ func (m *MemoryStore) clean() {
 	}
 }
 
-// newUUID generates a random UUID according to RFC 4122
-func newUUID() (string, error) {
-	uuid := make([]byte, 16)
-	io.ReadFull(rand.Reader, uuid)
-	uuid[8] = uuid[8]&^0xc0 | 0x80
-	uuid[6] = uuid[6]&^0xf0 | 0x40
-	return fmt.Sprintf("%x%x%x%x%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:]), nil
+// NewSID generates a random SID
+func NewSID(val string) string {
+	h := sha256.New()
+	h.Write([]byte(val))
+	io.CopyN(h, rand.Reader, 8)
+	return hex.EncodeToString(h.Sum(nil))
 }
