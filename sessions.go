@@ -7,6 +7,9 @@ import (
 	"github.com/go-http-utils/cookie"
 )
 
+// Version is this package's version
+const Version = "1.0.0"
+
 // Store is an interface for custom session stores.
 type Store interface {
 	// Load should load data from cookie and store, set it into session instance.

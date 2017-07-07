@@ -4,10 +4,9 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"sync"
 	"time"
-
-	"io"
 
 	"github.com/go-http-utils/cookie"
 )

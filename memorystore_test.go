@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-
 	"time"
 
 	"github.com/go-http-utils/cookie"
