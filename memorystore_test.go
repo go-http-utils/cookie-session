@@ -59,25 +59,25 @@ func TestMemoryStore(t *testing.T) {
 			assert.Equal(int64(useage), session.Age)
 			assert.False(session.IsNew())
 			assert.True(session.GetSID() != "")
+			assert.Nil(session.Destroy())
 		})
+		recorder = httptest.NewRecorder()
 		handler.ServeHTTP(recorder, req)
 
-		//====== reuse session=====
-
+		//====== destroy session=====
 		req, err = http.NewRequest("GET", "/", nil)
 		migrateCookies(recorder, req)
 
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := &Session{Meta: &sessions.Meta{}}
-			store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
-
-			assert.Equal(username, session.Name)
-			assert.Equal(useage, session.Age)
-			assert.False(session.IsNew())
-			assert.True(session.GetSID() != "")
+			err := store.Load(SessionName, session, cookie.New(w, r, SessionKeys...))
+			assert.NotNil(err)
+			assert.True(session.IsNew())
 		})
+		recorder = httptest.NewRecorder()
 		handler.ServeHTTP(recorder, req)
 	})
+
 	t.Run("Sessions with sign session that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		recorder := httptest.NewRecorder()
@@ -117,9 +117,10 @@ func TestMemoryStore(t *testing.T) {
 			assert.Equal(secondUsage, session.Age)
 
 		})
+		recorder = httptest.NewRecorder()
 		handler.ServeHTTP(recorder, req)
-
 	})
+
 	t.Run("Sessions with Name() and Store()  that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		recorder := httptest.NewRecorder()
@@ -155,6 +156,7 @@ func TestMemoryStore(t *testing.T) {
 		assert.Equal(true, cookies.Secure)
 
 	})
+
 	t.Run("Sessions donn't override old value when seting same value that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
@@ -184,6 +186,7 @@ func TestMemoryStore(t *testing.T) {
 		})
 		handler.ServeHTTP(recorder, req)
 	})
+
 	t.Run("Sessions with high goroutine should be", func(t *testing.T) {
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
@@ -237,9 +240,10 @@ func TestMemoryStore(t *testing.T) {
 		})
 		handler.ServeHTTP(recorder, req)
 
-		store.Destroy()
+		store.Close()
 	})
 }
+
 func genID() string {
 	buf := make([]byte, 12)
 	_, err := rand.Read(buf)

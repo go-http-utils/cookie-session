@@ -21,6 +21,11 @@ func (s *Session) Save() error {
 	return s.GetStore().Save(s)
 }
 
+// Destroy ...
+func (s *Session) Destroy() error {
+	return s.GetStore().Destroy(s)
+}
+
 func main() {
 	SessionName := "Sess"
 	SessionKeys := []string{"keyxxx"}

@@ -16,7 +16,7 @@ func NewMemoryStore(options ...*Options) (store *MemoryStore) {
 	opts := &cookie.Options{
 		Path:     "/",
 		HTTPOnly: true,
-		Signed:   true,
+		Signed:   false, // not necessary
 		MaxAge:   24 * 60 * 60,
 	}
 	if len(options) > 0 && options[0] != nil {
@@ -90,6 +90,18 @@ func (m *MemoryStore) Save(session Sessions) (err error) {
 	return
 }
 
+// Destroy destroy the session
+func (m *MemoryStore) Destroy(session Sessions) (err error) {
+	sid := session.GetSID()
+	if sid != "" {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		delete(m.store, sid)
+	}
+	session.GetCookie().Remove(session.GetName(), m.opts)
+	return
+}
+
 // Len ...
 func (m *MemoryStore) Len() int {
 	m.lock.Lock()
@@ -97,8 +109,8 @@ func (m *MemoryStore) Len() int {
 	return len(m.store)
 }
 
-// Destroy goroutine cleanCache thread
-func (m *MemoryStore) Destroy() {
+// Close goroutine cleanCache thread
+func (m *MemoryStore) Close() {
 	close(m.done)
 }
 
@@ -113,6 +125,7 @@ func (m *MemoryStore) cleanCache() {
 		}
 	}
 }
+
 func (m *MemoryStore) clean() {
 	m.lock.Lock()
 	defer m.lock.Unlock()

@@ -57,3 +57,9 @@ func (c *CookieStore) Save(session Sessions) (err error) {
 	}
 	return
 }
+
+// Destroy destroy the session
+func (c *CookieStore) Destroy(session Sessions) (err error) {
+	session.GetCookie().Remove(session.GetName(), c.opts)
+	return
+}

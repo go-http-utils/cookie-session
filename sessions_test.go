@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-http-utils/cookie"
 	"github.com/go-http-utils/cookie-session"
@@ -22,6 +23,11 @@ type Session struct {
 func (s *Session) Save() error {
 	return s.GetStore().Save(s)
 }
+
+func (s *Session) Destroy() error {
+	return s.GetStore().Destroy(s)
+}
+
 func TestSessions(t *testing.T) {
 
 	SessionName := "teambition"
@@ -80,6 +86,7 @@ func TestSessions(t *testing.T) {
 		})
 		handler.ServeHTTP(recorder, req)
 	})
+
 	t.Run("Sessions with sign session that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		recorder := httptest.NewRecorder()
@@ -124,6 +131,7 @@ func TestSessions(t *testing.T) {
 		handler.ServeHTTP(recorder, req)
 
 	})
+
 	t.Run("Sessions with Name() and Store()  that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		recorder := httptest.NewRecorder()
@@ -159,6 +167,7 @@ func TestSessions(t *testing.T) {
 		assert.Equal(true, cookies.Secure)
 
 	})
+
 	t.Run("Sessions with Encode() and Decode()  that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		dt := make(map[string]interface{})
@@ -168,7 +177,8 @@ func TestSessions(t *testing.T) {
 		_, err = sessions.Encode(make(chan int))
 		assert.NotNil(err)
 	})
-	t.Run("Sessions donn't override old value when seting same value that should be", func(t *testing.T) {
+
+	t.Run("Sessions don't override old value when seting same value that should be", func(t *testing.T) {
 		assert := assert.New(t)
 		req, err := http.NewRequest("GET", "/", nil)
 		assert.Nil(err)
@@ -247,6 +257,7 @@ func TestSessionCompatible(t *testing.T) {
 		handler.ServeHTTP(recorder, req)
 	})
 }
+
 func getCookie(name string, recorder *httptest.ResponseRecorder) (*http.Cookie, error) {
 	var err error
 	res := &http.Response{Header: http.Header{"Set-Cookie": recorder.HeaderMap["Set-Cookie"]}}
@@ -257,8 +268,11 @@ func getCookie(name string, recorder *httptest.ResponseRecorder) (*http.Cookie, 
 	}
 	return nil, err
 }
+
 func migrateCookies(recorder *httptest.ResponseRecorder, req *http.Request) {
 	for _, cookie := range recorder.Result().Cookies() {
-		req.AddCookie(cookie)
+		if !cookie.Expires.IsZero() && !cookie.Expires.Before(time.Now()) {
+			req.AddCookie(cookie)
+		}
 	}
 }

@@ -18,12 +18,14 @@ type Store interface {
 	Load(name string, session Sessions, cookie *cookie.Cookies) error
 	// Save should persist session to the underlying store implementation.
 	Save(session Sessions) error
+	// Destroy should destroy the session.
+	Destroy(session Sessions) error
 }
 
 // Sessions ...
 type Sessions interface {
 	// Init sets current cookie.Cookies and Store to the session instance.
-	Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string)
+	Init(name, sid string, c *cookie.Cookies, store Store, lastValue string)
 	// GetSID returns the session' sid
 	GetSID() string
 	// GetName returns the session' name
@@ -41,20 +43,20 @@ type Sessions interface {
 // Meta stores the values and optional configuration for a session.
 type Meta struct {
 	// Values map[string]interface{}
-	sid      string
-	store    Store
-	name     string
-	cookie   *cookie.Cookies
-	lastvale string
+	sid       string
+	store     Store
+	name      string
+	cookie    *cookie.Cookies
+	lastValue string
 }
 
 // Init sets current cookie.Cookies and Store to the session instance.
-func (s *Meta) Init(name, sid string, c *cookie.Cookies, store Store, lastvalue string) {
+func (s *Meta) Init(name, sid string, c *cookie.Cookies, store Store, lastValue string) {
 	s.name = name
 	s.sid = sid
 	s.cookie = c
 	s.store = store
-	s.lastvale = lastvalue
+	s.lastValue = lastValue
 }
 
 // GetSID returns the session' sid
@@ -79,7 +81,7 @@ func (s *Meta) GetCookie() *cookie.Cookies {
 
 // IsChanged to check current session's value whether is changed
 func (s *Meta) IsChanged(val string) bool {
-	return s.lastvale != val
+	return s.lastValue != val
 }
 
 // IsNew to check the current session whether it's new user
